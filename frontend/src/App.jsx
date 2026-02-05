@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import Orb from './components/Orb';
 import { 
   Bot, 
-  Send, 
+  Send,
+  Forward, 
   Loader2, 
   CheckCircle2, 
   AlertCircle, 
@@ -10,9 +12,9 @@ import {
   Github, 
   CloudSun, 
   Newspaper, 
-  ArrowRight,
   BrainCircuit,
-  Code2
+  Code2,
+  Lightbulb
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -23,6 +25,61 @@ function cn(...inputs) {
 }
 
 // --- Components ---
+
+
+
+const QuickActionCard = ({ icon: Icon, title, description, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className="group relative bg-white hover:bg-purple-50/50 rounded-2xl p-6 border border-slate-200 hover:border-purple-300 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 text-left w-full"
+    >
+      <div className="flex items-start gap-4">
+        <div className="p-3 rounded-xl bg-purple-100 group-hover:bg-purple-200 transition-colors">
+          <Icon className="w-5 h-5 text-purple-600" />
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-slate-800 mb-1 group-hover:text-purple-900 transition-colors">
+            {title}
+          </h3>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            {description}
+          </p>
+        </div>
+      </div>
+    </button>
+  );
+};
+
+const MessageBubble = ({ type, content }) => {
+  const isUser = type === 'user';
+  
+  return (
+    <div className={cn(
+      "flex gap-3 animate-fade-in-up",
+      isUser ? "justify-end" : "justify-start"
+    )}>
+      {!isUser && (
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-purple-300 flex items-center justify-center shrink-0">
+          <Bot className="w-5 h-5 text-white" />
+        </div>
+      )}
+      <div className={cn(
+        "max-w-[80%] rounded-2xl px-5 py-3",
+        isUser 
+          ? "bg-gradient-to-br from-purple-600 to-purple-500 text-white" 
+          : "glass-card text-slate-800 border border-slate-200"
+      )}>
+        <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
+      </div>
+      {isUser && (
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-500 to-slate-400 flex items-center justify-center shrink-0">
+          <span className="text-white text-sm font-medium">U</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const StatusBadge = ({ status }) => {
   const styles = {
@@ -44,7 +101,7 @@ const StatusBadge = ({ status }) => {
   };
 
   return (
-    <div className={cn("px-3 py-1 rounded-full border text-xs font-medium flex items-center gap-2 transition-all", styles[status])}>
+    <div className={cn("px-3 py-1.5 rounded-full border text-xs font-medium flex items-center gap-2 transition-all", styles[status])}>
       {status === 'planning' && <BrainCircuit className="w-3 h-3" />}
       {status === 'executing' && <Terminal className="w-3 h-3" />}
       {status === 'verifying' && <CheckCircle2 className="w-3 h-3" />}
@@ -66,13 +123,13 @@ const StepCard = ({ step, isCompleted, isCurrent }) => {
   return (
     <div className={cn(
       "relative border rounded-lg p-4 transition-all duration-300",
-      isCurrent ? "bg-white border-blue-400 shadow-md scale-[1.02]" : "bg-slate-50 border-slate-200",
+      isCurrent ? "bg-white border-purple-400 shadow-md scale-[1.02]" : "bg-slate-50 border-slate-200",
       isCompleted ? "opacity-75" : "opacity-100"
     )}>
       <div className="flex items-start gap-3">
         <div className={cn(
           "w-8 h-8 rounded-full flex items-center justify-center shrink-0 border",
-          isCurrent ? "bg-blue-100 border-blue-300 text-blue-600" : "bg-white border-slate-200 text-slate-500"
+          isCurrent ? "bg-purple-100 border-purple-300 text-purple-600" : "bg-white border-slate-200 text-slate-500"
         )}>
            {getIcon(step.tool)}
         </div>
@@ -94,9 +151,9 @@ const StepCard = ({ step, isCompleted, isCurrent }) => {
 const ResultViewer = ({ data, summary }) => {
   return (
     <div className="mt-6 space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="glass-card rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center gap-2">
-          <Bot className="w-4 h-4 text-indigo-500" />
+          <Bot className="w-4 h-4 text-purple-500" />
           <h3 className="font-semibold text-slate-800">Agent Summary</h3>
         </div>
         <div className="p-4 text-slate-700 leading-relaxed">
@@ -106,7 +163,7 @@ const ResultViewer = ({ data, summary }) => {
 
       <div className="grid grid-cols-1 gap-4">
         {Object.entries(data).map(([key, value]) => (
-          <div key={key} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div key={key} className="glass-card rounded-xl shadow-sm border border-slate-200 overflow-hidden">
              <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
                 <code className="text-xs text-slate-500 font-mono">{key}</code>
              </div>
@@ -125,32 +182,65 @@ const ResultViewer = ({ data, summary }) => {
 function App() {
   const [task, setTask] = useState("");
   const [status, setStatus] = useState('idle');
+  const [messages, setMessages] = useState([]);
   const [plan, setPlan] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+
+  const quickActions = [
+    {
+      icon: Github,
+      title: "GitHub Operations",
+      description: "Check repository stats, create issues, and manage PRs"
+    },
+    {
+      icon: CloudSun,
+      title: "Weather Information",
+      description: "Get current weather and forecasts for any location"
+    },
+    {
+      icon: Newspaper,
+      title: "News Updates",
+      description: "Fetch latest news on any topic or category"
+    },
+    {
+      icon: Lightbulb,
+      title: "Custom Task",
+      description: "Run any automated task or workflow"
+    }
+  ];
+
+  const handleQuickAction = (action) => {
+    setTask(action.description);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!task.trim()) return;
 
+    // Add user message
+    setMessages(prev => [...prev, { type: 'user', content: task }]);
+    
     setStatus('planning');
     setPlan(null);
     setResult(null);
     setError(null);
+    
+    const currentTask = task;
+    setTask(""); // Clear input
 
     try {
-      // Simulate phases for better UX (since backend does it all in one go currently)
-      // Ideally backend would stream events, but we'll fake the progress for now
-      // or just show "Processing"
-      
-      const response = await axios.post('http://localhost:8000/task', { task });
-      
+      const response = await axios.post('http://localhost:8000/task', { task: currentTask });
       const data = response.data;
       
-      // If we had the plan separately, we'd show it. 
-      // The backend returns everything at once, so we just show the final state.
       setPlan(data.plan);
       setResult(data);
+      
+      // Add agent response
+      setMessages(prev => [...prev, { 
+        type: 'agent', 
+        content: data.summary || "Task completed successfully!" 
+      }]);
       
       if (data.status === 'success') {
         setStatus('success');
@@ -162,99 +252,167 @@ function App() {
     } catch (err) {
       console.error(err);
       setStatus('error');
-      setError(err.response?.data?.detail || "Failed to connect to agent backend");
+      const errorMsg = err.response?.data?.detail || "Failed to connect to agent backend";
+      setError(errorMsg);
+      setMessages(prev => [...prev, { 
+        type: 'agent', 
+        content: `Error: ${errorMsg}` 
+      }]);
     }
   };
 
+  const hasMessages = messages.length > 0;
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      <div className="max-w-3xl mx-auto px-6 py-12">
+    <div className="min-h-screen flex flex-col">
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-6 py-8">
         
-        {/* Header */}
-        <header className="mb-12 text-center">
-          <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-sm border border-slate-200 mb-4">
-            <Bot className="w-8 h-8 text-indigo-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">AI Operations Agent</h1>
-          <p className="text-slate-500 text-lg">Your autonomous assistant for GitHub, News, and more.</p>
-        </header>
+        {/* Empty State - Centered Welcome */}
+        {!hasMessages && (
+          <div className="flex-1 flex flex-col items-center justify-center max-w-2xl mx-auto w-full animate-fade-in-up">
+            
+            {/* Decorative Orb */}
+            <Orb/>
+            
+            {/* Greeting */}
+            <div className="text-center mb-12">
+              <h1 className="text-2xl text-purple-400 mb-2 font-light">
+                Hi, I'm TaskFlow
+              </h1>
+              <p className="text-4xl font-bold text-slate-900">
+                How can I assist you today?
+              </p>
+            </div>
 
-        {/* Input Area */}
-        <form onSubmit={handleSubmit} className="mb-8 relative">
-          <div className="relative group">
-            <input
-              type="text"
-              value={task}
-              onChange={(e) => setTask(e.target.value)}
-              placeholder="Describe your task..."
-              className="w-full px-6 py-4 pr-16 text-lg bg-white rounded-2xl shadow-sm border border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all placeholder:text-slate-400"
-              disabled={status === 'planning' || status === 'executing' || status === 'verifying'}
-            />
-            <button
-              type="submit"
-              disabled={!task.trim() || status !== 'idle' && status !== 'success' && status !== 'error'}
-              className="absolute right-2 top-2 bottom-2 aspect-square bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-colors shadow-sm"
-            >
-              {status === 'idle' || status === 'success' || status === 'error' ? (
-                <Send className="w-5 h-5" />
-              ) : (
-                <Loader2 className="w-5 h-5 animate-spin" />
+            {/* Input Field */}
+            <form onSubmit={handleSubmit} className="w-full mb-8">
+              <div className="relative group">
+                <input
+                  type="text"
+                  value={task}
+                  onChange={(e) => setTask(e.target.value)}
+                  placeholder="Ask me anything..."
+                  className="w-full px-6 py-4 pr-14 text-base bg-white rounded-2xl shadow-lg border border-slate-200 focus:border-purple-400 focus:ring-4 focus:ring-purple-400/10 outline-none transition-all placeholder:text-slate-400"
+                  disabled={status === 'planning' || status === 'executing' || status === 'verifying'}
+                />
+                <button
+                  type="submit"
+                  disabled={!task.trim() || (status !== 'idle' && status !== 'success' && status !== 'error')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-all shadow-md"
+                >
+                  {status === 'idle' || status === 'success' || status === 'error' ? (
+                    <Forward className="w-5 h-5" />
+                  ) : (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  )}
+                </button>
+              </div>
+              {error && (
+                <div className="mt-3 flex items-center justify-center gap-2 text-red-600 text-sm font-medium">
+                  <AlertCircle className="w-4 h-4" />
+                  {error}
+                </div>
               )}
-            </button>
+            </form>
+
+            {/* Quick Actions */}
+            <div className="w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {quickActions.map((action, idx) => (
+                  <QuickActionCard
+                    key={idx}
+                    icon={action.icon}
+                    title={action.title}
+                    description={action.description}
+                    onClick={() => handleQuickAction(action)}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-          {error && (
-            <div className="absolute top-full mt-2 left-0 right-0 flex items-center justify-center gap-2 text-red-600 text-sm font-medium animate-in fade-in slide-in-from-top-1">
-              <AlertCircle className="w-4 h-4" />
-              {error}
-            </div>
-          )}
-        </form>
+        )}
 
-        {/* Status Area */}
-        <div className="flex justify-center mb-8">
-           <StatusBadge status={status} />
-        </div>
-
-        {/* Content Area */}
-        <div className="space-y-8 pb-20">
-          
-          {/* Plan Section */}
-          {plan && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 ease-out">
-              <div className="flex items-center gap-2 mb-4">
-                 <BrainCircuit className="w-5 h-5 text-indigo-500" />
-                 <h2 className="text-lg font-semibold text-slate-800">Execution Plan</h2>
-              </div>
+        {/* Chat State - Messages at top, input at bottom */}
+        {hasMessages && (
+          <>
+            {/* Messages Area */}
+            <div className="flex-1 overflow-y-auto space-y-4 mb-6">
+              {messages.map((msg, idx) => (
+                <MessageBubble key={idx} type={msg.type} content={msg.content} />
+              ))}
               
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-1 space-y-2">
-                 {/* Summary */}
-                 <div className="px-5 py-4 border-b border-slate-100">
-                    <p className="text-slate-600 italic">"{plan.task_summary}"</p>
-                 </div>
+              {/* Status Badge */}
+              {status !== 'idle' && status !== 'success' && (
+                <div className="flex justify-center py-4">
+                  <StatusBadge status={status} />
+                </div>
+              )}
 
-                 {/* Steps */}
-                 <div className="p-4 space-y-3 bg-slate-50/50 rounded-xl">
-                   {plan.steps.map((step, idx) => (
-                     <StepCard 
-                        key={idx} 
-                        step={step} 
-                        isCompleted={true} // Since we get full response, all are done
-                        isCurrent={false}
-                     />
-                   ))}
-                 </div>
-              </div>
+              {/* Plan Section */}
+              {plan && (
+                <div className="animate-fade-in-up">
+                  <div className="flex items-center gap-2 mb-4">
+                     <BrainCircuit className="w-5 h-5 text-purple-500" />
+                     <h2 className="text-lg font-semibold text-slate-800">Execution Plan</h2>
+                  </div>
+                  
+                  <div className="glass-card rounded-2xl shadow-sm border border-slate-200 p-1 space-y-2">
+                     {/* Summary */}
+                     <div className="px-5 py-4 border-b border-slate-100">
+                        <p className="text-slate-600 italic">"{plan.task_summary}"</p>
+                     </div>
+
+                     {/* Steps */}
+                     <div className="p-4 space-y-3 bg-slate-50/50 rounded-xl">
+                       {plan.steps.map((step, idx) => (
+                         <StepCard 
+                            key={idx} 
+                            step={step} 
+                            isCompleted={true}
+                            isCurrent={false}
+                         />
+                       ))}
+                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Results Section */}
+              {result && (
+                <div className="animate-fade-in-up">
+                   <ResultViewer data={result.data} summary={result.summary} />
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Results Section */}
-          {result && (
-            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out delay-150">
-               <ResultViewer data={result.data} summary={result.summary} />
+            {/* Fixed Input at Bottom */}
+            <div className="sticky bottom-0 bg-gradient-to-t from-slate-50 via-purple-50/20 to-transparent pt-4 pb-2">
+              <form onSubmit={handleSubmit}>
+                <div className="relative group">
+                  <input
+                    type="text"
+                    value={task}
+                    onChange={(e) => setTask(e.target.value)}
+                    placeholder="Ask me anything..."
+                    className="w-full px-6 py-4 pr-14 text-base bg-white rounded-2xl shadow-lg border border-slate-200 focus:border-purple-400 focus:ring-4 focus:ring-purple-400/10 outline-none transition-all placeholder:text-slate-400"
+                    disabled={status === 'planning' || status === 'executing' || status === 'verifying'}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!task.trim() || (status !== 'idle' && status !== 'success' && status !== 'error')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-gradient-to-br from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center transition-all shadow-md"
+                  >
+                    {status === 'idle' || status === 'success' || status === 'error' ? (
+                      <Send className="w-5 h-5" />
+                    ) : (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
-          )}
-
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
